@@ -1,0 +1,33 @@
+{
+  "Code":{
+    "ga.codex.replithelper.Main":"return function (Token)\r\n    local Decoded = Json.decode(Import(\"ga.codex.replithelper.lib.base64url\").decode(Split(Token, \".\")[2]))\r\n    return Decoded\r\nend",
+    "ga.codex.replithelper.Test":"local Package = {}\n\nfunction Package.OnInitialize()\n\n    p(\n        Import(\"ga.codex.replithelper.Main\")(\"eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiQ29yZUJ5dGVzIiwic3ViIjoiNDQwMDQ5NSIsInJvbGVzIjoiIiwidGVhbXMiOiIiLCJpYXQiOjE2NDA2MjI5ODQsImhvc3QiOiJsb2NhbGhvc3QifQ.ZPDA2Ei0-xfeMauZHbTU4Gcw234v6BBXuPb76cUi788zDaj8oeuFuqGA1wQjIDjBxwqB8wSzLWJN2KIDKcz4hw\")\n    )\n    \n\nend\n\nreturn Package\n",
+    "ga.codex.replithelper.lib.base64url":"--[[lit-meta\n  name = \"creationix/base64url\"\n  description = \"A pure lua implemention of base64url using bitop\"\n  tags = {\"crypto\", \"base64\", \"base64url\", \"bitop\"}\n  version = \"2.0.0\"\n  license = \"MIT\"\n  homepage = \"https://github.com/creationix/luvit-jwt/blob/master/libs/base64url.lua\"\n  author = { name = \"Tim Caswell\" }\n]]\n\nlocal bit = require 'bit'\nlocal rshift = bit.rshift\nlocal lshift = bit.lshift\nlocal bor = bit.bor\nlocal band = bit.band\nlocal char = string.char\nlocal byte = string.byte\nlocal concat = table.concat\nlocal codes = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_='\n\n-- Loop over input 3 bytes at a time\n-- a,b,c are 3 x 8-bit numbers\n-- they are encoded into groups of 4 x 6-bit numbers\n-- aaaaaa aabbbb bbbbcc cccccc\n-- if there is no c, then pad the 4th with =\n-- if there is also no b then pad the 3rd with =\nlocal function base64Encode(str)\n  local parts = {}\n  local j = 1\n  for i = 1, #str, 3 do\n    local a, b, c = byte(str, i, i + 2)\n    parts[j] = char(\n      -- Higher 6 bits of a\n      byte(codes, rshift(a, 2) + 1),\n      -- Lower 2 bits of a + high 4 bits of b\n      byte(codes, bor(\n        lshift(band(a, 3), 4),\n        b and rshift(b, 4) or 0\n      ) + 1),\n      -- Low 4 bits of b + High 2 bits of c\n      b and byte(codes, bor(\n        lshift(band(b, 15), 2),\n        c and rshift(c, 6) or 0\n      ) + 1) or 61, -- 61 is '='\n      -- Lower 6 bits of c\n      c and byte(codes, band(c, 63) + 1) or 61 -- 61 is '='\n    )\n    j = j + 1\n  end\n  if #parts > 0 then\n    j = j - 1\n    local last = parts[j]\n    local i = string.find(last, \"=\", 1, true)\n    if i then\n      parts[j] = string.sub(last, 1, i - 1)\n    end\n  end\n  return concat(parts)\nend\n\n-- Reverse map from character code to 6-bit integer\nlocal map = {}\nfor i = 1, #codes do\n  map[byte(codes, i)] = i - 1\nend\n\n-- loop over input 4 characters at a time\n-- The characters are mapped to 4 x 6-bit integers a,b,c,d\n-- They need to be reassalbled into 3 x 8-bit bytes\n-- aaaaaabb bbbbcccc ccdddddd\n-- if d is padding then there is no 3rd byte\n-- if c is padding then there is no 2nd byte\nlocal function base64Decode(data)\n  local bytes = {}\n  local j = 1\n  for i = 1, #data, 4 do\n    local a = map[byte(data, i)]\n    local b = map[byte(data, i + 1)]\n    local c = map[byte(data, i + 2)] or 64\n    local d = map[byte(data, i + 3)] or 64\n\n    -- higher 6 bits are the first char\n    -- lower 2 bits are upper 2 bits of second char\n    bytes[j] = char(bor(lshift(a, 2), rshift(b, 4)))\n\n    -- if the third char is not padding, we have a second byte\n    if c < 64 then\n      -- high 4 bits come from lower 4 bits in b\n      -- low 4 bits come from high 4 bits in c\n      bytes[j + 1] = char(bor(lshift(band(b, 0xf), 4), rshift(c, 2)))\n\n      -- if the fourth char is not padding, we have a third byte\n      if d < 64 then\n        -- Upper 2 bits come from Lower 2 bits of c\n        -- Lower 6 bits come from d\n        bytes[j + 2] = char(bor(lshift(band(c, 3), 6), d))\n      end\n    end\n    j = j + 3\n  end\n  return concat(bytes)\nend\n\nassert(base64Encode(\"\") == \"\")\nassert(base64Encode(\"f\") == \"Zg\")\nassert(base64Encode(\"fo\") == \"Zm8\")\nassert(base64Encode(\"foo\") == \"Zm9v\")\nassert(base64Encode(\"foob\") == \"Zm9vYg\")\nassert(base64Encode(\"fooba\") == \"Zm9vYmE\")\nassert(base64Encode(\"foobar\") == \"Zm9vYmFy\")\n\nassert(base64Decode(\"\") == \"\")\nassert(base64Decode(\"Zg==\") == \"f\")\nassert(base64Decode(\"Zm8=\") == \"fo\")\nassert(base64Decode(\"Zm9v\") == \"foo\")\nassert(base64Decode(\"Zm9vYg==\") == \"foob\")\nassert(base64Decode(\"Zm9vYmE=\") == \"fooba\")\nassert(base64Decode(\"Zm9vYmFy\") == \"foobar\")\n\nreturn {\n  encode = base64Encode,\n  decode = base64Decode,\n}\n"
+  },
+  "PackageInfo":{
+    "Dependencies":{
+      "Luvit":[],
+      "Dua":[]
+    },
+    "Entrypoints":{
+      "Main":"ga.codex.replithelper.Test"
+    },
+    "Contact":{
+      "Source":"https://github.com/codex-bot-team/replit-helper",
+      "Socials":[],
+      "Website":""
+    },
+    "ID":"ReplitHelper",
+    "Version":"1.0.1",
+    "Description":"Replit token helper",
+    "InfoVersion":1,
+    "Author":{
+      "Contributors":["Codex Team"],
+      "Developers":["CoreByte"]
+    },
+    "Name":"Replit-Helper"
+  },
+  "Resources":{
+    "/package.info.lua":"cmV0dXJuIHsKCiAgICBJbmZvVmVyc2lvbiA9IDEsIC0tIERvbnQgdG91Y2ggdGhpcwoKICAgIElEID0gIlJlcGxpdEhlbHBlciIsIC0tIEEgdW5pcXVlIGlkIAogICAgVmVyc2lvbiA9ICIxLjAuMSIsIC0tIFRoZSBwYWNrYWdlIHZlcnNpb24KCiAgICBOYW1lID0gIlJlcGxpdC1IZWxwZXIiLCAtLSBUaGUgbmFtZSBvZiB0aGUgcHJvamVjdCwgY2FuIHVzZSBzcGFjZXMKICAgIERlc2NyaXB0aW9uID0gIlJlcGxpdCB0b2tlbiBoZWxwZXIiLCAtLSBEZXNjcmlwdGlvbgoKICAgIEF1dGhvciA9IHsKICAgICAgICBEZXZlbG9wZXJzID0gewogICAgICAgICAgICAiQ29yZUJ5dGUiCiAgICAgICAgfSwKICAgICAgICBDb250cmlidXRvcnMgPSB7CiAgICAgICAgICAgICJDb2RleCBUZWFtIgogICAgICAgIH0KICAgIH0sCgogICAgRGVwZW5kZW5jaWVzID0gewogICAgICAgIEx1dml0ID0ge30sCiAgICAgICAgRHVhID0ge30KICAgIH0sCgogICAgQ29udGFjdCA9IHsKICAgICAgICBXZWJzaXRlID0gIiIsIC0tIEhvbWVwYWdlCiAgICAgICAgU291cmNlID0gImh0dHBzOi8vZ2l0aHViLmNvbS9jb2RleC1ib3QtdGVhbS9yZXBsaXQtaGVscGVyIiwgLS0gR2l0aHViIHJlcHJvCiAgICAgICAgU29jaWFscyA9IHt9CiAgICB9LAoKICAgIEVudHJ5cG9pbnRzID0gewogICAgICAgIE1haW4gPSAiZ2EuY29kZXgucmVwbGl0aGVscGVyLlRlc3QiCiAgICB9Cgp9Cg=="
+  }
+}

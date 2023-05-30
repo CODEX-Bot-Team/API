@@ -1,0 +1,34 @@
+{
+  "Code":{
+    "ga.codex.Duabase.Database":"local Database = Class:extend()\r\n\r\nlocal FS = require(\"fs\")\r\nlocal Json = require(\"json\")\r\n\r\nlocal Table = Import(\"ga.codex.Duabase.Table\")\r\n\r\nfunction Database:initialize(Settings)\r\n    self.Settings = Settings\r\n\r\n    if FS.existsSync(Settings.Location) then\r\n        local FileData = FS.readFileSync(Settings.Location)\r\n        local SplitData = Split(FileData, \"\\n\")\r\n        local RawData = SplitData[#SplitData]\r\n\r\n        self.Data = Json.decode(({Settings.AfterRead(self, RawData)})[2])\r\n        self:Save()\r\n    else\r\n        self.Data = {}\r\n        self.Data.Tables = {}\r\n        self.Data.Version = 1\r\n\r\n        self:Save()\r\n    end\r\n\r\n    self.ClassedTables = {}\r\n\r\nend\r\n\r\nfunction Database:Save()\r\n    FS.writeFileSync(\r\n        self.Settings.Location,\r\n        self.Settings.Header .. \"\\n\\nHere comes the data:\\n\" .. ({self.Settings.BeforeSave(self, Json.encode(self.Data))})[2]\r\n    )\r\nend\r\n\r\nfunction Database:GetTable(Name)\r\n    self:CreateTable(Name)\r\n    if self.ClassedTables[Name] then\r\n        return self.ClassedTables[Name]\r\n    end\r\n\r\n    local ClassedTable = Table:new(self, Name)\r\n    self.ClassedTables[Name] = ClassedTable\r\n    return ClassedTable\r\nend\r\n\r\nfunction Database:CreateTable(Name)\r\n    if self.Data.Tables[Name] then\r\n        return false\r\n    end\r\n    self.Data.Tables[Name] = {}\r\n    return true\r\nend\r\n\r\nreturn Database",
+    "ga.codex.Duabase.Main":"local Duabase = {}\r\n\r\nlocal FS = require(\"fs\")\r\nlocal Path = require(\"path\")\r\n\r\nlocal Database = Import(\"ga.codex.Duabase.Database\")\r\n\r\nlocal Header = [[\r\nThis is a database file written by Duabase\r\nLibrary created by CoreByte\r\nFor the CODEX-Bot-Team]]\r\n\r\nfunction Duabase.Open(Location, Settings)\r\n    Settings = Settings or {}\r\n    Settings.AfterRead = Settings.AfterRead or function (self, Data)\r\n        return true, Data\r\n    end\r\n\r\n    Settings.BeforeSave = Settings.BeforeSave or function (self, Data)\r\n        return true, Data\r\n    end\r\n\r\n    Settings.Location = Location .. \".db\"\r\n    Settings.Header = Header\r\n\r\n\r\n    return Database:new(Settings)\r\nend\r\n\r\nfunction Duabase.IsDatabase(Location, Create, Settings)\r\n    if Create == nil then Create = true end\r\n\r\n    if not FS.existsSync(Location) then\r\n        if Create then\r\n            FS.writeFileSync()\r\n        end\r\n    end\r\n    return true\r\nend\r\n\r\nreturn Duabase",
+    "ga.codex.Duabase.Test":"local Package = {}\n\nfunction Package.OnInitialize()\n\n    print(\"And The package has loaded!\")\n    print(\"Hello!\")\n    \n    local Database = Import(\"ga.codex.Duabase.Main\").Open(\"./Test\")\n    Database:CreateTable(\"Test\")\n    local Table = Database:GetTable(\"Test\")\n    p(Table:Set(\"abc\", \"def\"))\n    p(Table:Get(\"abc\"))\n    p(Table:GetKeys())\nend\n\nreturn Package\n",
+    "ga.codex.Duabase.Table":"local TableBase = Class:extend()\r\n\r\nfunction TableBase:initialize(Database, Name)\r\n    self.Name = Name\r\n    self.Database = Database\r\nend\r\n\r\nfunction TableBase:GetKey(Key)\r\n    return self.Database.Data.Tables[self.Name][Key]\r\nend\r\n\r\nfunction TableBase:SetKey(Key, Value)\r\n    self.Database.Data.Tables[self.Name][Key] = Value\r\n    self.Database:Save()\r\n    return true\r\nend\r\n\r\nfunction TableBase:GetKeys()\r\n    local Keys = {}\r\n    for Key, Value in pairs(self.Database.Data.Tables[self.Name]) do\r\n        table.insert(Keys, Key)\r\n    end\r\n    return Keys\r\nend\r\n\r\nfunction TableBase:Get(Key)\r\n    return self:GetKey(Key)\r\nend\r\n\r\nfunction TableBase:Set(Key, Value)\r\n    return self:SetKey(Key, Value)\r\nend\r\n\r\nfunction TableBase:List()\r\n    return self:GetKeys()\r\nend\r\n\r\nreturn TableBase"
+  },
+  "PackageInfo":{
+    "Description":"A Dua template",
+    "Author":{
+      "Contributors":[],
+      "Developers":["CoreByte"]
+    },
+    "Dependencies":{
+      "Dua":[],
+      "Luvit":["creationix/coro-fs","luvit/path","luvit/json"]
+    },
+    "Entrypoints":{
+      "Main":"ga.codex.Duabase.Test"
+    },
+    "ID":"duabase",
+    "Contact":{
+      "Socials":[],
+      "Website":"https://codex-bot.ga",
+      "Source":""
+    },
+    "InfoVersion":1,
+    "Name":"duabase",
+    "Version":"1.0.0"
+  },
+  "Resources":{
+    "/package.info.lua":"LS0gU2VlIGh0dHBzOi8vZ2l0aHViLmNvbS9Eb3QtbHVhL1R5cGVXcml0ZXIvd2lraS9wYWNrYWdlLmluZm8ubHVhLWZvcm1hdCBmb3IgbW9yZSBpbmZvCgpyZXR1cm4gewoKICAgIEluZm9WZXJzaW9uID0gMSwKCiAgICBJRCA9ICJkdWFiYXNlIiwKICAgIFZlcnNpb24gPSAiMS4wLjAiLAoKICAgIE5hbWUgPSAiZHVhYmFzZSIsCiAgICBEZXNjcmlwdGlvbiA9ICJBIER1YSB0ZW1wbGF0ZSIsCgogICAgQXV0aG9yID0gewogICAgICAgIERldmVsb3BlcnMgPSB7CiAgICAgICAgICAgICJDb3JlQnl0ZSIKICAgICAgICB9LAogICAgICAgIENvbnRyaWJ1dG9ycyA9IHt9CiAgICB9LAoKICAgIERlcGVuZGVuY2llcyA9IHsKICAgICAgICBMdXZpdCA9IHsKICAgICAgICAgICAgImNyZWF0aW9uaXgvY29yby1mcyIsCiAgICAgICAgICAgICJsdXZpdC9wYXRoIiwKICAgICAgICAgICAgImx1dml0L2pzb24iCiAgICAgICAgfSwKICAgICAgICBEdWEgPSB7fQogICAgfSwKCiAgICBDb250YWN0ID0gewogICAgICAgIFdlYnNpdGUgPSAiaHR0cHM6Ly9jb2RleC1ib3QuZ2EiLCAtLSBIb21lcGFnZQogICAgICAgIFNvdXJjZSA9ICIiLCAtLSBHaXRodWIgcmVwcm8KICAgICAgICBTb2NpYWxzID0ge30KICAgIH0sCgogICAgRW50cnlwb2ludHMgPSB7CiAgICAgICAgTWFpbiA9ICJnYS5jb2RleC5EdWFiYXNlLlRlc3QiCiAgICB9Cgp9Cg=="
+  }
+}
